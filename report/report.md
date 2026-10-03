@@ -163,7 +163,7 @@ Part 2 uses two binary classification datasets. Each has a separate train and te
 
 Both datasets are close enough to balanced for accuracy to be a sensible metric, although RingSyn leans towards class 1. A model that always predicts class 1 already gets **65.7%** on the RingSyn test set, so this majority-class baseline is used as the yardstick in Tasks b and c. A useful model has to beat it clearly.
 
-In RingSyn, class 1 is an inner disc (mean distance from the origin 0.71) and class 0 is a ring around it (mean distance 0.99), so the classes cannot be separated by a straight line. The handout calls the RingSyn features `x1` and `x2`, but the files name them `feature1` and `feature2`, so the code reads the column names from each file's header instead of hard-coding them.
+In RingSyn, class 1 forms a complete ring around the origin (most points are 0.54–0.88 from the origin), and class 0 forms a wider half-ring outside it (0.82–1.15 from the origin) that only covers the lower half: every class 0 point has feature2 < 0. The two classes overlap slightly where their distances from the origin meet, at about 0.85, and they cannot be separated by a straight line (see Figure 6). The handout calls the RingSyn features `x1` and `x2`, but the files name them `feature1` and `feature2`, so the code reads the column names from each file's header instead of hard-coding them.
 
 One thing to note about SeaSyn: the 40 test rows are identical to the first 40 rows of the training file. The SeaSyn "test" accuracy in Task a is therefore measured on data the perceptron was trained on, and it shows how well the model fits the training data rather than how well it generalises. The RingSyn train and test files share no rows.
 
@@ -245,6 +245,76 @@ The pocket results confirm this. Keeping the best weights seen during training m
 Two caveats apply to these numbers. The test set has only 40 samples, so each mistake changes test accuracy by 2.5 percentage points. Also, as noted in the Data section, the 40 test rows are copies of the first 40 training rows, so test accuracy closely follows training accuracy and says little about how well the model generalises to new data.
 
 ### Task b: Perceptron on non-linearly separable data (RingSyn)
+
+Task b reuses the Task a perceptron and experiment code without any changes. Only the data files are different (`python3 part2/perceptron.py --task b`). As before, each row is a fresh model trained with seed 42. The "Predicted 1" column is the share of the 300 test samples that the model predicts as class 1.
+
+| Model (epoch) | Train accuracy | Test accuracy | Predicted 1 | Mistakes in last epoch |
+|---|---|---|---|---|
+| Perceptron (1) | 0.700 | 0.743 | 0.593 | 133 |
+| Perceptron (5) | 0.673 | 0.697 | 0.440 | 127 |
+| Perceptron (10) | 0.764 | 0.757 | 0.693 | 141 |
+| Perceptron (15) | 0.698 | 0.727 | 0.557 | 140 |
+| Perceptron (20) | 0.660 | **0.640** | 0.537 | 144 |
+| Perceptron (50) | 0.689 | 0.747 | 0.510 | 147 |
+| Perceptron (60) | 0.733 | **0.790** | 0.720 | 134 |
+| Perceptron (80) | 0.689 | 0.730 | 0.580 | 138 |
+| Perceptron (100) | 0.669 | 0.657 | 1.000 | 143 |
+| Perceptron (120) | 0.728 | 0.773 | 0.677 | 129 |
+| Perceptron (150) | 0.722 | 0.727 | 0.570 | 126 |
+| Perceptron (200) | 0.711 | 0.747 | 0.583 | 139 |
+
+The majority-class baseline (always predicting class 1) gets **0.657** on the test set. The confusion matrix of the 200-epoch model on the test set is:
+
+| | Predicted 0 | Predicted 1 |
+|---|---|---|
+| **True 0** | 76 | 27 |
+| **True 1** | 49 | 148 |
+
+Mean ± std test accuracy over seeds 0–9, for the plain and pocket perceptrons (as in Task a):
+
+| Epochs | Perceptron test accuracy | Pocket perceptron test accuracy |
+|---|---|---|
+| 1 | 0.723 ± 0.041 | 0.723 ± 0.041 |
+| 5 | 0.679 ± 0.065 | 0.758 ± 0.045 |
+| 10 | 0.686 ± 0.058 | 0.777 ± 0.036 |
+| 15 | 0.699 ± 0.062 | 0.775 ± 0.038 |
+| 20 | 0.688 ± 0.043 | 0.780 ± 0.029 |
+| 50 | 0.719 ± 0.040 | 0.781 ± 0.010 |
+| 60 | 0.689 ± 0.065 | 0.783 ± 0.010 |
+| 80 | 0.730 ± 0.048 | 0.783 ± 0.010 |
+| 100 | 0.727 ± 0.068 | 0.783 ± 0.010 |
+| 120 | 0.713 ± 0.053 | 0.782 ± 0.009 |
+| 150 | 0.698 ± 0.062 | 0.781 ± 0.009 |
+| 200 | 0.716 ± 0.058 | 0.784 ± 0.009 |
+
+![Task b accuracy and mistakes per epoch](../part2/figures/task_b_perceptron.png)
+
+*Figure 5: Left: accuracy against the number of epochs (log scale) on RingSyn, with the majority-class baseline as a dotted line. Right: training samples misclassified in each epoch of the 200-epoch model (seed 42), which stays between 119 and 162.*
+
+![Task b decision boundaries](../part2/figures/task_b_boundaries.png)
+
+*Figure 6: The decision boundary of each model in the first table (seed 42), drawn over the RingSyn training data. RingSyn has only two features, so this is the full picture, not a slice.*
+
+**How well does the perceptron perform on this dataset?**
+
+The perceptron performs **poorly** on RingSyn. Its test accuracy ranges from 0.640 to 0.790 with seed 42, and averages 0.68–0.73 over 10 seeds. This is only 2–7 percentage points better than always predicting class 1 (0.657). The 20-epoch model is actually worse than the baseline. The 100-epoch model predicts class 1 for every test sample and scores exactly the baseline, 0.657. Training accuracy (0.66–0.76) is no better: always predicting class 1 already gets 0.669 of the training set right.
+
+As in Task a, more epochs do not help. Accuracy jumps between rows with no trend, and the perceptron never converges. In every epoch it misclassifies 119–162 of the 453 training samples, and the count never drops below 107 for any of the 10 seeds. So the weights change throughout training, and each row is just a snapshot of a line that keeps moving.
+
+The reason is the shape of the data. A perceptron can only draw one straight line, but RingSyn's classes are curved: class 1 is a full inner ring, and class 0 is a half-ring outside it, in the lower half only. The best a line can do is what Figure 6 shows in almost every panel: a roughly horizontal line across the lower half, predicting class 1 above it. This gets the top half right (it is all class 1), but in the lower half, the two classes lie on concentric arcs that no straight line can split. The bottom of the inner ring falls below the line and is predicted as class 0, and the two ends of the outer half-ring, which curve up to feature2 ≈ 0, stay above it and are predicted as class 1. These are the two kinds of error in the confusion matrix: 49 class 1 points predicted as 0, and 27 class 0 points predicted as 1. The perceptron keeps swapping between these errors, so the line keeps tilting and moving up and down.
+
+Even the best line found during training is limited. The pocket version reaches only about 0.78 test accuracy (about 0.79–0.80 on the training set) and levels off after about 20 epochs. This is very different from Task a:
+
+| | SeaSyn (Task a) | RingSyn (Task b) |
+|---|---|---|
+| Majority-class baseline (test) | 0.525 | 0.657 |
+| Plain perceptron, mean test accuracy over seeds | 0.69–0.81 | 0.68–0.73 |
+| Pocket perceptron, mean test accuracy at 200 epochs | 0.857 | 0.784 |
+| Gain of the pocket perceptron over the baseline | +33 points | +13 points |
+
+Neither dataset converges, but for different reasons. SeaSyn has a good linear boundary, and only noise stops the perceptron from settling on it. RingSyn has no good linear boundary at all, so even the best line is only a modest improvement on guessing the majority class.
+
+The limitation comes from the perceptron's linear decision boundary, not from how it is trained. As an extra check (also printed by `--task b`), I gave the **same, unchanged** perceptron a third input, r² = feature1² + feature2², the squared distance from the origin. A threshold on r² separates the inner ring from the outer half-ring, and a straight line in (feature1, feature2, r²) space corresponds to a circle in the original two features. With this one extra feature, test accuracy rises to 0.79–0.95 across the epoch counts (0.953 after 200 epochs). It still doesn't converge, because the two classes overlap slightly at radius ≈ 0.85. Choosing a feature like r² by hand only works because I looked at the data. A multilayer perceptron's hidden layer can learn suitable non-linear features by itself, which is what Task c tests.
 
 ### Task c: MLP on non-linearly separable data (RingSyn)
 

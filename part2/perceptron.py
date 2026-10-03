@@ -14,6 +14,7 @@ The model itself uses only numpy. No machine learning library is used in this fi
 Run from the repo root:
     .venv/Scripts/python part2/perceptron.py              # all tasks
     .venv/Scripts/python part2/perceptron.py --task a     # Task a (SeaSyn) only
+    .venv/Scripts/python part2/perceptron.py --task b     # Task b (RingSyn) only
     .venv/Scripts/python part2/perceptron.py --plot       # also save figures to part2/figures/
     .venv/Scripts/python part2/perceptron.py --selftest   # AND / XOR sanity checks
 """
@@ -30,6 +31,7 @@ EPOCHS = [1, 5, 10, 15, 20, 50, 60, 80, 100, 120, 150, 200]  # from the handout
 # task -> (title, train file, test file)
 TASKS = {
     "a": ("Task a: SeaSyn", "SeaSynTrain", "SeaSynTest"),
+    "b": ("Task b: RingSyn", "RingSynTrain", "RingSynTest"),  # same perceptron, no changes
 }
 
 
@@ -173,14 +175,23 @@ def selftest():
     return passed
 
 
-def load_scaled(train_name, test_name):
+def add_radius_feature(X, names):
+    """Append r^2 = x1^2 + x2^2 (squared distance from the origin) as an extra feature."""
+    return np.c_[X, (X[:, :2] ** 2).sum(axis=1)], [*names, f"{names[0]}^2 + {names[1]}^2"]
+
+
+def load_scaled(train_name, test_name, radius_feature=False):
     """Load a train/test pair and standardise both with the scaler fitted on train only.
 
     Returns (X_train, y_train, X_test, y_test, scaler, feature_names). The scaler is
     returned so the plots can show the original, unscaled feature values.
+    radius_feature=True adds r^2 as a third input (only used for the extra Task b check).
     """
     X_train, y_train, names = load_dataset(train_name)
     X_test, y_test, _ = load_dataset(test_name)
+    if radius_feature:
+        X_test, _ = add_radius_feature(X_test, names)
+        X_train, names = add_radius_feature(X_train, names)
     scaler = StandardScaler().fit(X_train)
     return scaler.transform(X_train), y_train, scaler.transform(X_test), y_test, scaler, names
 
@@ -219,12 +230,43 @@ def multi_seed_test_acc(X_train, y_train, X_test, y_test, n_seeds, pocket=False)
     return acc
 
 
-def print_sweep_table(title, rows, n_train, n_test, seed):
-    print(f"{title} (train {n_train}, test {n_test}, seed {seed})")
-    print("| Model (epoch)    | Train acc | Test acc | Mistakes in last epoch |")
-    print("|------------------|-----------|----------|------------------------|")
-    for n_epochs, train_acc, test_acc, mistakes, _ in rows:
-        print(f"| {f'Perceptron ({n_epochs})':<16} | {train_acc:9.3f} | {test_acc:8.3f} | {mistakes:22d} |")
+def print_sweep_table(title, rows, n_train, X_test, seed):
+    """Print the results table. 'Predicted 1' is the share of test samples predicted as class 1."""
+    print(f"{title} (train {n_train}, test {len(X_test)}, seed {seed})")
+    print("| Model (epoch)    | Train acc | Test acc | Predicted 1 | Mistakes in last epoch |")
+    print("|------------------|-----------|----------|-------------|------------------------|")
+    for n_epochs, train_acc, test_acc, mistakes, model in rows:
+        pred_1 = model.predict(X_test).mean()
+        print(f"| {f'Perceptron ({n_epochs})':<16} | {train_acc:9.3f} | {test_acc:8.3f} | {pred_1:11.3f} | {mistakes:22d} |")
+    print()
+
+
+def confusion_matrix(y_true, y_pred):
+    """2x2 matrix: rows = true class 0/1, columns = predicted class 0/1."""
+    return np.array([[np.sum((y_true == t) & (y_pred == p)) for p in (0, 1)] for t in (0, 1)])
+
+
+def majority_baseline(y_train, y_test):
+    """Test accuracy of always predicting the most common class in the training set."""
+    majority = np.bincount(y_train).argmax()
+    return majority, accuracy(y_test, majority)
+
+
+def print_diagnostics(rows, y_train, X_test, y_test):
+    """Majority-class baseline, confusion matrix of the last model, and whether training ever converged."""
+    majority, baseline = majority_baseline(y_train, y_test)
+    print(f"Majority-class baseline (always predict {majority}): test acc {baseline:.3f}")
+
+    n_epochs, _, _, _, model = rows[-1]
+    cm = confusion_matrix(y_test, model.predict(X_test))
+    print(f"Test confusion matrix, Perceptron ({n_epochs}):")
+    print("|         | Pred 0 | Pred 1 |")
+    print("|---------|--------|--------|")
+    for t in (0, 1):
+        print(f"| True {t}  | {cm[t, 0]:6d} | {cm[t, 1]:6d} |")
+    errors = model.errors_
+    print(f"Mistakes per epoch over all {len(errors)} epochs: min {min(errors)}, max {max(errors)}"
+          f" ({'converged' if min(errors) == 0 else 'never 0, so it never converged'})")
     print()
 
 
@@ -255,7 +297,7 @@ def _save(fig, filename):
     print(f"Saved {out_path.relative_to(Path(__file__).resolve().parent.parent).as_posix()}")
 
 
-def plot_sweep(task, title, rows, plain, pocket, seed):
+def plot_sweep(task, title, rows, plain, pocket, seed, baseline):
     """Save accuracy vs epochs and mistakes per epoch to part2/figures/."""
     plt = _pyplot()
     fig, (ax_acc, ax_err) = plt.subplots(1, 2, figsize=(11, 4))
@@ -267,6 +309,7 @@ def plot_sweep(task, title, rows, plain, pocket, seed):
         mean, std = acc.mean(axis=0), acc.std(axis=0)
         ax_acc.plot(epochs, mean, color=colour, label=f"{name} test acc, mean ± std of {acc.shape[0]} seeds")
         ax_acc.fill_between(epochs, mean - std, mean + std, color=colour, alpha=0.2)
+    ax_acc.axhline(baseline, color="grey", linestyle=":", label=f"Majority-class baseline ({baseline:.3f})")
     ax_acc.set_xscale("log")
     ax_acc.set_xticks(epochs)
     ax_acc.minorticks_off()
@@ -336,16 +379,36 @@ def run_task(task, seed, n_seeds, plot):
     X_train, y_train, X_test, y_test, scaler, names = load_scaled(train_name, test_name)
 
     rows = run_epoch_sweep(X_train, y_train, X_test, y_test, seed)
-    print_sweep_table(title, rows, len(X_train), len(X_test), seed)
+    print_sweep_table(title, rows, len(X_train), X_test, seed)
+    print_diagnostics(rows, y_train, X_test, y_test)
 
     plain = multi_seed_test_acc(X_train, y_train, X_test, y_test, n_seeds)
     pocket = multi_seed_test_acc(X_train, y_train, X_test, y_test, n_seeds, pocket=True)
     print_multi_seed_table(plain, pocket)
 
     if plot:
-        plot_sweep(task, title, rows, plain, pocket, seed)
+        plot_sweep(task, title, rows, plain, pocket, seed, majority_baseline(y_train, y_test)[1])
         plot_boundary_grid(task, title, rows, X_train, y_train, scaler, names, seed)
         print()
+
+    if task == "b":
+        print_radius_feature_check(train_name, test_name, seed)
+
+
+def print_radius_feature_check(train_name, test_name, seed):
+    """Extra check for Task b: the same perceptron, given r^2 = x1^2 + x2^2 as a third input.
+
+    The model is unchanged. Only the input changes, which shows that the problem in Task b
+    is the features, not the training.
+    """
+    X_train, y_train, X_test, y_test, _, names = load_scaled(train_name, test_name, radius_feature=True)
+    rows = run_epoch_sweep(X_train, y_train, X_test, y_test, seed)
+    print(f"Extra check: same perceptron with inputs {', '.join(names)} (seed {seed})")
+    print("| Epochs | " + " | ".join(f"{e:5d}" for e in EPOCHS) + " |")
+    print("|--------|" + "|".join("-------" for _ in EPOCHS) + "|")
+    print("| Train  | " + " | ".join(f"{r[1]:.3f}" for r in rows) + " |")
+    print("| Test   | " + " | ".join(f"{r[2]:.3f}" for r in rows) + " |")
+    print()
 
 
 def main():
