@@ -48,7 +48,11 @@ As a check, the start times satisfy t1 ≤ t2 ≤ … ≤ t6 (0 ≤ 10 ≤ 50 �
 
 Process(O11, M1, 0) → Process(O21, M2, 10) → Process(O31, M1, 50) → Process(O12, M2, 50) → Process(O22, M1, 90) → Process(O32, M2, 90)
 
+Figure 1 shows this schedule as a Gantt chart. The waits identified above are visible as gaps: O31 waits for M1 until 50, and M2 is idle at 40–50 and 75–90 while O12 and O32 wait for their first operations to finish.
+
 ![FCFS Gantt chart](../part1/figures/fcfs_gantt.png)
+
+*Figure 1: Gantt chart of the FCFS schedule from Q1 (makespan 125). Bars are coloured by job, hatched areas are machine idle time, and dashed lines mark job arrivals.*
 
 ### Q2. Completion times and makespan (FCFS)
 
@@ -96,7 +100,11 @@ Process(O11, M1, 0) → Process(O21, M2, 10) → Process(O22, M1, 50) → Proces
 
 O22 and O12 both start at 50, so either order is valid. They are listed with M1 first, consistent with the tie at t = 50 in the Q1 sequence.
 
+To double-check the hand calculations, I wrote a small optional script (`part1/gantt.py`). It checks both schedules against the arrival, precedence and resource constraints, and simulates non-delay dispatching with each rule. The simulation produces exactly the Q1 schedule when using FCFS and exactly the schedule above when using SPT. Figure 2 shows the SPT schedule.
+
 ![SPT Gantt chart](../part1/figures/spt_gantt.png)
+
+*Figure 2: Gantt chart of the SPT schedule from Q3 (makespan 145), drawn on the same time axis as Figure 1. M2 is idle from 75 to 125 while it waits for O31 to finish on M1.*
 
 ### Q4. SPT completion times, makespan and comparison
 
