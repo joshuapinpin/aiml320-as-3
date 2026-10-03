@@ -190,6 +190,60 @@ To check the implementation before using it on the assignment data, `python3 par
 
 ### Task a: Perceptron on linearly separable data (SeaSyn)
 
+For each number of epochs in the handout's list, a fresh perceptron was trained on SeaSynTrain and evaluated on SeaSynTest (`python3 part2/perceptron.py --task a`). Every model uses the same shuffle seed (42), so the model trained for E epochs is exactly the first E epochs of the 200-epoch model, and the table shows snapshots of a single training run. The last column is the number of training samples the perceptron got wrong (and updated on) during its final epoch.
+
+| Model (epoch) | Train accuracy | Test accuracy | Mistakes in last epoch |
+|---|---|---|---|
+| Perceptron (1) | 0.630 | 0.675 | 31 |
+| Perceptron (5) | 0.750 | 0.700 | 26 |
+| Perceptron (10) | 0.740 | 0.675 | 25 |
+| Perceptron (15) | 0.560 | 0.550 | 24 |
+| Perceptron (20) | 0.840 | **0.850** | 23 |
+| Perceptron (50) | 0.660 | 0.550 | 30 |
+| Perceptron (60) | 0.730 | 0.750 | 25 |
+| Perceptron (80) | 0.780 | 0.750 | 19 |
+| Perceptron (100) | 0.750 | 0.700 | 18 |
+| Perceptron (120) | 0.750 | 0.775 | 25 |
+| Perceptron (150) | 0.480 | **0.400** | 20 |
+| Perceptron (200) | 0.740 | 0.775 | 29 |
+
+One seed could be misleading, so the sweep was repeated with seeds 0–9. The table below gives the mean ± standard deviation of test accuracy. It also shows a "pocket" version of the same perceptron. Its learning is identical, but at the end of each epoch it measures training accuracy and keeps the best weights seen so far, instead of the weights left by the last epoch. The pocket version only uses the training data to choose its weights.
+
+| Epochs | Perceptron test accuracy | Pocket perceptron test accuracy |
+|---|---|---|
+| 1 | 0.745 ± 0.073 | 0.745 ± 0.073 |
+| 5 | 0.738 ± 0.065 | 0.823 ± 0.024 |
+| 10 | 0.773 ± 0.045 | 0.827 ± 0.026 |
+| 15 | 0.807 ± 0.059 | 0.847 ± 0.021 |
+| 20 | 0.733 ± 0.056 | 0.847 ± 0.024 |
+| 50 | 0.742 ± 0.084 | 0.853 ± 0.018 |
+| 60 | 0.753 ± 0.062 | 0.853 ± 0.018 |
+| 80 | 0.688 ± 0.103 | 0.850 ± 0.016 |
+| 100 | 0.722 ± 0.124 | 0.855 ± 0.015 |
+| 120 | 0.742 ± 0.089 | 0.855 ± 0.015 |
+| 150 | 0.703 ± 0.121 | 0.855 ± 0.015 |
+| 200 | 0.747 ± 0.064 | 0.857 ± 0.016 |
+
+![Task a accuracy and mistakes per epoch](../part2/figures/task_a_perceptron.png)
+
+*Figure 3: Left: accuracy against the number of epochs (log scale) on SeaSyn, for seed 42 and as the mean ± std over seeds 0–9 for the plain and pocket perceptrons. Right: training samples misclassified in each epoch of the 200-epoch model (seed 42). The count never reaches 0.*
+
+![Task a decision boundaries](../part2/figures/task_a_boundaries.png)
+
+*Figure 4: The decision boundary of each model in the first table (seed 42), drawn over the SeaSyn training data. SeaSyn has three features, so each panel is a 2D slice through attrib1 and attrib2 with attrib3 fixed at its training mean. The shading is the predicted class within that slice. A point's real prediction also depends on its own attrib3 value, so a few points can be classified differently from the shading behind them.*
+
+**How does increasing the number of epochs affect the model's accuracy?**
+
+For this perceptron on SeaSyn, training for more epochs does **not** make it more accurate. With seed 42, test accuracy jumps between rows with no upward trend. It is 0.850 after 20 epochs but 0.550 after 50 and 0.400 after 150. Averaged over 10 seeds, it stays roughly flat at 0.69–0.81 for every epoch count, and the standard deviation (up to 0.12) is as large as the differences between rows. Accuracy after 200 epochs (0.747) is no better than after 1 epoch (0.745).
+
+The reason is that SeaSyn is **not perfectly linearly separable**, even though the task treats it as linearly separable data. The classes are roughly split by the line attrib1 + attrib2 = 8 (that rule alone gets 88% of the training set right), but about 12% of the points are on the "wrong" side of any line. I checked this separately: a linear-programming feasibility test (scipy) found no line that separates the training set, and a linear SVM (scikit-learn) reached only 85% training accuracy. This is most likely label noise added by the SEA data generator. The Perceptron Convergence Theorem only guarantees that the perceptron stops changing when a separating line exists, so it does not apply here. In contrast, the AND self-test, which is separable, converged after 7 epochs.
+
+Instead, some training samples are misclassified in every epoch (between 15 and 36 per epoch across all seeds, never 0, as Figure 3 shows), so every epoch updates the weights and the decision boundary keeps moving. Each update fixes one point but can move the line past many others. The model returned after E epochs is just wherever the last few updates left the line, not the best line found so far. Stopping at a different epoch is like taking a random snapshot, which is why accuracy depends much more on where training stops than on how long it ran. Figure 4 shows this directly. After 20 and 100 epochs the line runs diagonally between the two classes, roughly along the attrib1 + attrib2 = 8 split. After 10 and 50 epochs it is much too flat and cuts through the class 1 points, and after 150 epochs it lies outside the slice altogether. The 150-epoch model had put most of its weight on attrib3, the feature that has no relationship with the class, and it predicts class 1 for 86% of the training set, which explains its 0.400 test accuracy.
+
+The pocket results confirm this. Keeping the best weights seen during training makes test accuracy rise with the number of epochs, from 0.745 to about 0.85 by 15–20 epochs, and then level off with a small standard deviation. Its training accuracy reaches 0.86–0.87, close to the best any line can do. So the perceptron does find good lines during training, but the plain learning rule cannot settle on one. Other common fixes are a learning rate that decreases over time (unlike a constant learning rate, a schedule does change the result even with zero initial weights) or averaging the weights over all updates.
+
+Two caveats apply to these numbers. The test set has only 40 samples, so each mistake changes test accuracy by 2.5 percentage points. Also, as noted in the Data section, the 40 test rows are copies of the first 40 training rows, so test accuracy closely follows training accuracy and says little about how well the model generalises to new data.
+
 ### Task b: Perceptron on non-linearly separable data (RingSyn)
 
 ### Task c: MLP on non-linearly separable data (RingSyn)
