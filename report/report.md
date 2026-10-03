@@ -167,6 +167,27 @@ In RingSyn, class 1 is an inner disc (mean distance from the origin 0.71) and cl
 
 One thing to note about SeaSyn: the 40 test rows are identical to the first 40 rows of the training file. The SeaSyn "test" accuracy in Task a is therefore measured on data the perceptron was trained on, and it shows how well the model fits the training data rather than how well it generalises. The RingSyn train and test files share no rows.
 
+### Perceptron implementation
+
+The perceptron used in Tasks a and b is written from scratch in `part2/perceptron.py`, using only numpy for array maths. The same class is used, unchanged, for both tasks.
+
+| Part | Choice | Reason |
+|---|---|---|
+| Activation | Step function: ŷ = 1 if w·x + b ≥ 0, otherwise ŷ = 0 | This is the classic Rosenblatt perceptron, and its 0/1 output matches the dataset labels. |
+| Bias | A separate bias term b, updated like a weight on a constant input of 1 | Without it, the decision boundary would have to pass through the origin. |
+| Initialisation | w = 0 and b = 0 | Deterministic, so results only depend on the shuffle seed. |
+| Learning rule | Online (one sample at a time): w ← w + η(y − ŷ)x and b ← b + η(y − ŷ) | The standard perceptron rule. y − ŷ is 0 when the prediction is correct, so the weights only change on mistakes. A false negative (y = 1, ŷ = 0) moves the boundary towards x, and a false positive moves it away. |
+| Learning rate | η = 1.0 | Because the weights start at zero, every update is a multiple of η, so η only scales w and b and never changes which side of the boundary a point falls on. Any positive η gives exactly the same predictions, and I confirmed this by training with η = 0.01, 1 and 7. |
+| Epoch | One full pass over the training set, in a new random order each epoch | Shuffling stops the result depending on the order of rows in the file. The shuffle uses a fixed seed (42), so every run is reproducible. |
+| Feature scaling | Each feature is standardised to mean 0 and standard deviation 1, using the mean and std of the **training** set only, and the same values are applied to the test set | SeaSyn features range from 0 to 10, while the bias input is always 1. Without scaling, the bias would learn much more slowly than the weights. Fitting the scaler only on the training set prevents test data leaking into training. |
+
+During training the model records how many training samples it misclassified (and therefore updated on) in each epoch. If this count reaches 0, the boundary separates the training data perfectly and no further epoch changes the weights. If it never reaches 0, the boundary keeps moving every epoch.
+
+To check the implementation before using it on the assignment data, `python3 part2/perceptron.py --selftest` trains the perceptron for 20 epochs on two 4-point logic gates:
+
+- **AND** (linearly separable): the error count goes 1, 3, 2, 2, 2, 2, 3 and then stays at 0 from epoch 8, ending with 100% accuracy.
+- **XOR** (not linearly separable): there is at least one error in every epoch and accuracy ends at 50%, because no single line can separate XOR's classes.
+
 ### Task a: Perceptron on linearly separable data (SeaSyn)
 
 ### Task b: Perceptron on non-linearly separable data (RingSyn)
