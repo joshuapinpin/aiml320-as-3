@@ -152,6 +152,21 @@ Q6 is required for AIML420 students only. This report is for AIML320, so Q6 was 
 
 ## Part 2: Neural Networks
 
+### Data
+
+Part 2 uses two binary classification datasets. Each has a separate train and test file, and the target column is `class` (0 or 1).
+
+| Dataset | Train rows | Test rows | Features | Class 1 share (train / test) |
+|---|---|---|---|---|
+| SeaSyn | 100 | 40 | `attrib1`, `attrib2`, `attrib3` (values between 0 and 10) | 52.0% / 52.5% |
+| RingSyn | 453 | 300 | `feature1`, `feature2` (values between about −1.2 and 1.1) | 66.9% / 65.7% |
+
+Both datasets are close enough to balanced for accuracy to be a sensible metric, although RingSyn leans towards class 1. A model that always predicts class 1 already gets **65.7%** on the RingSyn test set, so this majority-class baseline is used as the yardstick in Tasks b and c. A useful model has to beat it clearly.
+
+In RingSyn, class 1 is an inner disc (mean distance from the origin 0.71) and class 0 is a ring around it (mean distance 0.99), so the classes cannot be separated by a straight line. The handout calls the RingSyn features `x1` and `x2`, but the files name them `feature1` and `feature2`, so the code reads the column names from each file's header instead of hard-coding them.
+
+One thing to note about SeaSyn: the 40 test rows are identical to the first 40 rows of the training file. The SeaSyn "test" accuracy in Task a is therefore measured on data the perceptron was trained on, and it shows how well the model fits the training data rather than how well it generalises. The RingSyn train and test files share no rows.
+
 ### Task a: Perceptron on linearly separable data (SeaSyn)
 
 ### Task b: Perceptron on non-linearly separable data (RingSyn)
