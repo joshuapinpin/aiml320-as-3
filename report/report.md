@@ -48,7 +48,7 @@ As a check, the start times satisfy t1 ≤ t2 ≤ … ≤ t6 (0 ≤ 10 ≤ 50 �
 
 Process(O11, M1, 0) → Process(O21, M2, 10) → Process(O31, M1, 50) → Process(O12, M2, 50) → Process(O22, M1, 90) → Process(O32, M2, 90)
 
-Figure 1 shows this schedule as a Gantt chart. The waits identified above are visible as gaps: O31 waits for M1 until 50, and M2 is idle at 40–50 and 75–90 while O12 and O32 wait for their first operations to finish.
+Figure 1 shows this schedule as a Gantt chart. The waits identified above are visible as gaps: M2 is idle at 0–10 until J2 arrives, O31 waits for M1 until 50, and M2 is idle at 40–50 and 75–90 while O12 and O32 wait for their first operations to finish.
 
 ![FCFS Gantt chart](../part1/figures/fcfs_gantt.png)
 
@@ -159,3 +159,8 @@ Q6 is required for AIML420 students only. This report is for AIML320, so Q6 was 
 ### Task c: MLP on non-linearly separable data (RingSyn)
 
 ## References / External resources
+
+**Part 1**
+
+- The Q1–Q5 answers were worked out by hand from the problem definition in the assignment handout. No external code was used.
+- The optional checking script `part1/gantt.py` is my own code. It uses Python 3 and the Matplotlib library (J. D. Hunter, "Matplotlib: A 2D Graphics Environment", *Computing in Science & Engineering*, 9(3), 90–95, 2007) to draw Figures 1 and 2.
