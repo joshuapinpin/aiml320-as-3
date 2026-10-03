@@ -68,7 +68,58 @@ J2 determines the makespan. Although J2 arrives second and its first operation O
 
 ### Q3. SPT schedule
 
+A dispatching rule does not plan the whole schedule in advance. Instead, it simulates time moving forward and makes one decision at a time:
+
+- Each machine has a **queue** of operations that are ready for it. An operation is ready when its job has arrived (for Oj1) or when Oj1 has finished (for Oj2).
+- Whenever a machine is **idle** and its queue is **non-empty**, the rule chooses which queued operation to start next. The **Shortest Processing Time (SPT)** rule chooses the operation with the smallest processing time.
+- A machine with an empty queue stays idle, even if an operation will become ready soon (non-delay dispatching).
+
+The decision points are the times when a job arrives or an operation finishes, since these are the only times a queue or a machine's status can change. The trace below lists each decision point, with the processing times of queued operations in brackets.
+
+| Time t | Event(s) | M1 queue | M2 queue | Decision |
+|---|---|---|---|---|
+| 0 | J1 arrives → O11 ready | {O11(50)} | {} | M1 idle: starts O11, finishes at 50 |
+| 10 | J2 arrives → O21 ready | M1 busy | {O21(30)} | M2 idle: starts O21, finishes at 40 |
+| 20 | J3 arrives → O31 ready | {O31(40)} (M1 busy) | {} | M1 busy until 50: O31 waits |
+| 40 | O21 finishes → O22 ready | {O31(40), O22(35)} (M1 busy) | {} | M2 idle but its queue is empty |
+| 50 | O11 finishes → O12 ready | {O31(40), O22(35)} | {O12(25)} | **M1: SPT picks O22 (35 < 40)**, finishes at 85. M2: starts O12, finishes at 75 |
+| 75 | O12 finishes (J1 complete) | M1 busy | {} | M2 idle, queue empty |
+| 85 | O22 finishes (J2 complete) | {O31(40)} | {} | M1 starts O31, finishes at 125 |
+| 125 | O31 finishes → O32 ready | {} | {O32(20)} | M2 starts O32, finishes at 145 |
+| 145 | O32 finishes (J3 complete) | {} | {} | All jobs done |
+
+The only real choice happens at **t = 50**. M1 becomes free, and two operations are waiting for it: O31 (ready since 20, 40 time units) and O22 (ready since 40, 35 time units). SPT picks O22 because it is shorter. FCFS would pick O31 because it has been waiting longer. Applying the same procedure with FCFS reproduces the Q1 schedule exactly, so this single decision is the only difference between the two solutions.
+
+The final SPT solution, sorted by start time, is:
+
+Process(O11, M1, 0) → Process(O21, M2, 10) → Process(O22, M1, 50) → Process(O12, M2, 50) → Process(O31, M1, 85) → Process(O32, M2, 125)
+
+O22 and O12 both start at 50, so either order is valid. They are listed with M1 first, consistent with the tie at t = 50 in the Q1 sequence.
+
+![SPT Gantt chart](../part1/figures/spt_gantt.png)
+
 ### Q4. SPT completion times, makespan and comparison
+
+As in Q2, each job's completion time is the finish time of its second operation:
+
+| Job | Last operation | Start | Proc time | Completion time |
+|---|---|---|---|---|
+| J1 | O12 | 50 | 25 | **75** |
+| J2 | O22 | 50 | 35 | **85** |
+| J3 | O32 | 125 | 20 | **145** |
+
+**Makespan = max(75, 85, 145) = 145**
+
+Comparison with the FCFS solution from Q1 and Q2:
+
+| | J1 | J2 | J3 | Makespan |
+|---|---|---|---|---|
+| FCFS (Q1) | 75 | 125 | 110 | **125** |
+| SPT (Q3) | 75 | 85 | 145 | 145 |
+
+**In terms of makespan, the FCFS solution is better: 125 compared with 145, a difference of 20 time units.**
+
+SPT helps J2, which finishes 40 units earlier (85 instead of 125), but it delays J3 by 35 units (145 instead of 110). This happens because SPT runs O22 before O31 on M1, so O31 does not finish until 125. O32 cannot start on M2 until then, and M2 sits idle from 75 to 125. J3 now determines the makespan, and it is 20 units worse than under FCFS.
 
 ### Q5. Does a better solution imply a better rule?
 
