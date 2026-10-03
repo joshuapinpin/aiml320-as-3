@@ -1,4 +1,4 @@
-# AIML320 Assignment 3 — <Your Name> (<Student ID>)
+# AIML320 Assignment 3 — Joshua Pinpin (ID: 300662880)
 
 ## Part 1: Job Shop Scheduling
 
@@ -130,6 +130,25 @@ Comparison with the FCFS solution from Q1 and Q2:
 SPT helps J2, which finishes 40 units earlier (85 instead of 125), but it delays J3 by 35 units (145 instead of 110). This happens because SPT runs O22 before O31 on M1, so O31 does not finish until 125. O32 cannot start on M2 until then, and M2 sits idle from 75 to 125. J3 now determines the makespan, and it is 20 units worse than under FCFS.
 
 ### Q5. Does a better solution imply a better rule?
+
+**No.** FCFS producing the better solution on this instance does not mean FCFS is a better rule than SPT in general, for three reasons.
+
+**1. "Better" depends on the objective.** Makespan is only one way to measure a schedule. The table below compares both solutions on two other common objectives: mean flowtime (the average time a job spends in the shop, completion time minus arrival time) and total completion time. The values were computed from the completion times in Q2 and Q4.
+
+| Rule | Completion (J1, J2, J3) | Flowtime (J1, J2, J3) | Mean flowtime | Total completion time | Makespan |
+|---|---|---|---|---|---|
+| FCFS | 75, 125, 110 | 75, 115, 90 | 93.33 | 310 | **125** |
+| SPT | 75, 85, 145 | 75, 75, 125 | **91.67** | **305** | 145 |
+
+SPT is worse on makespan but better on both flowtime-based objectives, so even on this one instance neither rule dominates the other.
+
+**2. One small instance is not enough evidence.** This instance has only 3 jobs and 2 machines, and the two solutions differ in a single decision (at t = 50). Dispatching rules are heuristics, and how well they perform varies a lot between instances. Small changes can flip or remove the difference. For example, if J3 arrived after t = 50, O31 would not be in M1's queue at that decision point, and both rules would produce the same schedule. To conclude that one rule is better, both rules should be tested on many instances (e.g. randomly generated instances or a standard benchmark set), and their average performance should be compared, ideally with a statistical significance test.
+
+**3. Each rule suits different goals.** SPT is greedy and myopic. At t = 50 it chose O22 (35) over O31 (40) because O22 is shorter, without considering that J3 still had 60 units of work left (O31 + O32) while J2 had only 35. Delaying J3 left M2 idle from 75 to 125 and increased the makespan. A rule that considers remaining work, such as Most Work Remaining (MWKR), would have chosen O31 here and is generally better suited to makespan. SPT, by finishing short operations first, tends to reduce flowtime-type objectives, which is what happened here. So which rule is "better" depends on what the scheduler is trying to optimise.
+
+### Q6. (AIML420 only)
+
+Q6 is required for AIML420 students only. This report is for AIML320, so Q6 was not attempted.
 
 ## Part 2: Neural Networks
 
