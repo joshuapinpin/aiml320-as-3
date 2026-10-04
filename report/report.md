@@ -152,6 +152,8 @@ Q6 is required for AIML420 students only. This report is for AIML320, so Q6 was 
 
 ## Part 2: Neural Networks
 
+Part 2 compares a single perceptron, which I implemented from scratch (`part2/perceptron.py`), with a library multilayer perceptron (`part2/mlp.py`). Task a trains the perceptron on SeaSyn, Task b trains the same perceptron on RingSyn, and Task c trains an MLP on RingSyn. Accuracy (the fraction of test samples classified correctly) is the metric throughout. Every table and figure in this part was produced by the submitted programs, using the commands in `readme.txt`. A few supporting checks mentioned in the text (such as the linear separability test in Task a) were run separately, and are noted where they appear.
+
 ### Data
 
 Part 2 uses two binary classification datasets. Each has a separate train and test file, and the target column is `class` (0 or 1).
@@ -236,7 +238,7 @@ One seed could be misleading, so the sweep was repeated with seeds 0–9. The ta
 
 For this perceptron on SeaSyn, training for more epochs does **not** make it more accurate. With seed 42, test accuracy jumps between rows with no upward trend. It is 0.850 after 20 epochs but 0.550 after 50 and 0.400 after 150. Averaged over 10 seeds, it stays roughly flat at 0.69–0.81 for every epoch count, and the standard deviation (up to 0.12) is as large as the differences between rows. Accuracy after 200 epochs (0.747) is no better than after 1 epoch (0.745).
 
-The reason is that SeaSyn is **not perfectly linearly separable**, even though the task treats it as linearly separable data. The classes are roughly split by the line attrib1 + attrib2 = 8 (that rule alone gets 88% of the training set right), but about 12% of the points are on the "wrong" side of any line. I checked this separately: a linear-programming feasibility test (scipy) found no line that separates the training set, and a linear SVM (scikit-learn) reached only 85% training accuracy. This is most likely label noise added by the SEA data generator. The Perceptron Convergence Theorem only guarantees that the perceptron stops changing when a separating line exists, so it does not apply here. In contrast, the AND self-test, which is separable, converged after 7 epochs.
+The reason is that SeaSyn is **not perfectly linearly separable**, even though the task treats it as linearly separable data. The classes are roughly split by the line attrib1 + attrib2 = 8 (that rule alone gets 88% of the training set right), but about 12% of the points are on the "wrong" side of any line. I checked this separately: a linear-programming feasibility test (scipy) found no line that separates the training set, and a linear SVM (scikit-learn) reached only 85% training accuracy. This is most likely label noise: the SEA concept that this dataset appears to follow (Street & Kim, 2001) deliberately adds noise to about 10% of the class labels. The Perceptron Convergence Theorem only guarantees that the perceptron stops changing when a separating line exists, so it does not apply here. In contrast, the AND self-test, which is separable, converged after 7 epochs.
 
 Instead, some training samples are misclassified in every epoch (between 15 and 36 per epoch across all seeds, never 0, as Figure 3 shows), so every epoch updates the weights and the decision boundary keeps moving. Each update fixes one point but can move the line past many others. The model returned after E epochs is just wherever the last few updates left the line, not the best line found so far. Stopping at a different epoch is like taking a random snapshot, which is why accuracy depends much more on where training stops than on how long it ran. Figure 4 shows this directly. After 20 and 100 epochs the line runs diagonally between the two classes, roughly along the attrib1 + attrib2 = 8 split. After 10 and 50 epochs it is much too flat and cuts through the class 1 points, and after 150 epochs it lies outside the slice altogether. The 150-epoch model had put most of its weight on attrib3, the feature that has no relationship with the class, and it predicts class 1 for 86% of the training set, which explains its 0.400 test accuracy.
 
@@ -318,9 +320,94 @@ The limitation comes from the perceptron's linear decision boundary, not from ho
 
 ### Task c: MLP on non-linearly separable data (RingSyn)
 
+**Setup.** `part2/mlp.py` uses scikit-learn's `MLPClassifier` with **one hidden layer of 8 neurons** and the **tanh** activation, trained with the default **adam** optimiser (`max_iter=2000`, `random_state=42`). As for the perceptron, both features are standardised using the training set's mean and standard deviation, inside a scikit-learn pipeline, so the test data is never used for fitting. I chose 8 neurons, in the middle of the suggested 4–10, so the network has enough neurons to bend its boundary around the inner ring. I chose tanh because it is smooth, which suits a curved boundary. Training stopped after 1113 epochs, once the training loss had stopped improving, with no convergence warning. While setting this up I briefly tried 4, 8 and 10 hidden neurons with both tanh and ReLU. All gave a similar mean test accuracy (0.92–0.94 over 10 seeds), except ReLU with 4 neurons, which was less stable between seeds. As the handout asks for one reasonable setup, only this one is reported below. It uses the same train/test files as Task b (`python3 part2/mlp.py`).
+
+| Model | Train accuracy | Test accuracy |
+|---|---|---|
+| Majority class (always predict 1) | 0.669 | 0.657 |
+| MLP (8 hidden neurons, tanh) | 0.927 | **0.937** |
+
+Test confusion matrix of the MLP:
+
+| | Predicted 0 | Predicted 1 |
+|---|---|---|
+| **True 0** | 93 | 10 |
+| **True 1** | 9 | 188 |
+
+To check that 0.937 was not a lucky initialisation, the same setup was also trained with `random_state` 0–9. Test accuracy was 0.936 ± 0.003 (min 0.930, max 0.943), and training accuracy was 0.926 ± 0.003.
+
+![MLP decision boundary](../part2/figures/task_c_mlp.png)
+
+*Figure 7: Left: the MLP's predicted regions (blue = class 0, orange = class 1) over the RingSyn test data, with the 19 misclassified test points circled in red. Right: the same boundary (solid) with the line w·x + b = 0 of each of the 8 hidden neurons (dashed).*
+
+**Epoch sweep.** To compare the MLP with the perceptron on the same terms, `mlp.py` also repeats the Task b experiment for the MLP. For each number of epochs in the handout's list, a fresh MLP with the same setup is trained for exactly that many epochs (`max_iter`). With the same seed, the initial weights and shuffle order are identical, so each row is a snapshot of the main model partway through training. I checked this by confirming that the 200-epoch model's loss curve matches the first 200 epochs of the full run. The last column is the mean ± std test accuracy over seeds 0–9.
+
+| Model (epoch) | Train accuracy | Test accuracy | Predicted 1 | Test accuracy, 10 seeds |
+|---|---|---|---|---|
+| MLP (1) | 0.667 | 0.673 | 0.330 | 0.579 ± 0.133 |
+| MLP (5) | 0.675 | 0.677 | 0.333 | 0.598 ± 0.127 |
+| MLP (10) | 0.689 | 0.700 | 0.357 | 0.624 ± 0.112 |
+| MLP (15) | 0.693 | 0.730 | 0.400 | 0.653 ± 0.094 |
+| MLP (20) | 0.700 | 0.737 | 0.440 | 0.671 ± 0.089 |
+| MLP (50) | 0.709 | 0.767 | 0.537 | 0.739 ± 0.068 |
+| MLP (60) | 0.724 | 0.760 | 0.570 | 0.758 ± 0.056 |
+| MLP (80) | 0.748 | 0.780 | 0.630 | 0.763 ± 0.057 |
+| MLP (100) | 0.748 | 0.787 | 0.670 | 0.775 ± 0.043 |
+| MLP (120) | 0.744 | 0.807 | 0.703 | 0.781 ± 0.043 |
+| MLP (150) | 0.781 | 0.813 | 0.723 | 0.807 ± 0.017 |
+| MLP (200) | 0.808 | 0.833 | 0.730 | 0.835 ± 0.017 |
+| MLP (1113, fully trained) | 0.927 | **0.937** | 0.660 | 0.936 ± 0.003 |
+
+![MLP decision boundary after each number of epochs](../part2/figures/task_c_epochs.png)
+
+*Figure 8: The MLP's decision boundary after each number of epochs (seed 42), drawn over the RingSyn training data, in the same layout as Figure 6 for the perceptron.*
+
+**How does the performance of the MLP compare to the Perceptron from Task b on this dataset?**
+
+The MLP is much better. Its test accuracy is 0.937, compared with:
+
+- 0.640–0.790 for the perceptron in Task b with seed 42 (0.747 after 200 epochs), and 0.68–0.73 on average over 10 seeds,
+- 0.784 for the pocket perceptron, which is roughly the best a single straight line can do on this data,
+- 0.657 for the majority-class baseline.
+
+So the MLP is about 19 percentage points better than the perceptron after 200 epochs, 15 points better than the perceptron's best row, 15 points better than the best line, and 28 points better than the baseline. It makes 19 test mistakes instead of the perceptron's 76 (200-epoch model), and its mistakes are balanced across both classes (10 and 9) instead of mostly being class 1 points predicted as 0. It is also far more stable: its test accuracy varies by ±0.003 between random seeds, compared with about ±0.06 for the perceptron between seeds and up to 15 points between epoch counts.
+
+The epoch sweep shows that the two models also learn very differently. The perceptron's accuracy jumps up and down from one epoch count to the next (0.640–0.790), because each mistake moves its line by a full step. The MLP's accuracy rises almost every row, from 0.673 after 1 epoch to 0.833 after 200, and its spread between seeds shrinks from ±0.133 to ±0.017. The MLP is trained by gradient descent on a smooth loss, and adam takes many small steps that each reduce the loss a little, so the boundary moves gradually in one direction instead of jumping around. Figure 8 shows this: the boundary starts as an almost flat curve, much like the perceptron's line, slides steadily down towards the gap between the classes, and only starts to bend into a U at around 200 epochs.
+
+This also means the MLP needs more training than the perceptron. For short training (up to about 20 epochs) it is actually no better than the perceptron, and after the handout's longest run of 200 epochs it reaches 0.833, about 5 points better than the best line (0.784). It only reaches 0.937 when it is allowed to train until its loss stops improving, after 1113 epochs. Its advantage comes from what it can represent, a curved boundary, but it takes longer to find that boundary than the perceptron takes to find a line.
+
+**Was the MLP able to better capture the structure of the data? Why or why not?**
+
+Yes. Figure 7 shows that the MLP's boundary is a smooth U-shaped curve that follows the gap between the bottom of the inner ring (class 1) and the outer half-ring (class 0). The perceptron could only place a straight line across this gap (Figure 6). The MLP does not draw a full circle, because it does not need to: there are no class 0 points above feature2 ≈ 0, so it leaves the top of its class 1 region open. It has learned the part of the structure that actually separates the two classes.
+
+It can do this because of the hidden layer and its non-linear activation:
+
+1. **Each hidden neuron is like a perceptron.** It computes its own weighted sum w·x + b, so it has its own straight line (the dashed lines in Figure 7). The lines fall into two groups. One group is steep and runs along the left side of the U, and the other runs along the right side.
+2. **The tanh activation makes each neuron's output non-linear.** Each neuron's output changes smoothly from −1 to +1 as a point crosses its line, instead of growing without limit. Each neuron effectively answers "which side of my line is this point on?", with a soft transition near the line.
+3. **The output neuron combines these answers.** It takes a weighted sum of the 8 hidden outputs, so it can say "class 1 if the point is on the inner side of the left lines and the inner side of the right lines". Combining several soft half-planes like this gives a region whose boundary bends, and because tanh is smooth, the corners where lines meet are rounded into the curve in Figure 7.
+
+In other words, the hidden layer learns a new set of features in which the classes are almost linearly separable, and the output neuron then draws a linear boundary in that new space. This is the same idea as the r² feature at the end of Task b, but the MLP learned its features from the data instead of me choosing them by looking at the data. The non-linear activation is essential: without it, the output would be a linear function of a linear function of the input, which is still linear, so the MLP could do no better than the perceptron.
+
+The MLP is not perfect. All 19 misclassified test points are between 0.78 and 0.90 from the origin, while the test points as a whole range from 0.41 to 1.21. This is exactly the band where the inner ring and the outer half-ring overlap (Data section). Figure 7 shows these points on both sides of the boundary, mixed in with correctly classified points of the other class, so no smooth boundary could get all of them right. Training accuracy (0.927) is close to test accuracy (0.937), so the network is not overfitting. The remaining errors come from the overlap in the data, not from a lack of flexibility in the model.
+
 ## References / External resources
 
 **Part 1**
 
 - The Q1–Q5 answers were worked out by hand from the problem definition in the assignment handout. No external code was used.
 - The optional checking script `part1/gantt.py` is my own code. It uses Python 3 and the Matplotlib library (J. D. Hunter, "Matplotlib: A 2D Graphics Environment", *Computing in Science & Engineering*, 9(3), 90–95, 2007) to draw Figures 1 and 2.
+
+**Part 2**
+
+- The perceptron in `part2/perceptron.py` is implemented from scratch with numpy (C. R. Harris et al., "Array programming with NumPy", *Nature*, 585, 357–362, 2020), following the perceptron learning rule (F. Rosenblatt, "The perceptron: A probabilistic model for information storage and organization in the brain", *Psychological Review*, 65(6), 386–408, 1958). No machine learning library is used for the perceptron itself.
+- The "pocket" comparison in Tasks a and b is based on the pocket algorithm (S. I. Gallant, "Perceptron-based learning algorithms", *IEEE Transactions on Neural Networks*, 1(2), 179–191, 1990).
+- The MLP in `part2/mlp.py` uses scikit-learn's `MLPClassifier`, `StandardScaler`, `make_pipeline`, `accuracy_score` and `confusion_matrix` (F. Pedregosa et al., "Scikit-learn: Machine Learning in Python", *Journal of Machine Learning Research*, 12, 2825–2830, 2011). It is trained with the Adam optimiser (D. P. Kingma and J. Ba, "Adam: A Method for Stochastic Optimization", *ICLR*, 2015).
+- Figures 3–8 were drawn with Matplotlib (reference above).
+- The linear separability check for SeaSyn in Task a was run separately from the submitted programs, using SciPy's `linprog` (P. Virtanen et al., "SciPy 1.0: Fundamental Algorithms for Scientific Computing in Python", *Nature Methods*, 17, 261–272, 2020) and scikit-learn's `LinearSVC`.
+- The SEA concept mentioned in Task a is from W. N. Street and Y. Kim, "A Streaming Ensemble Algorithm (SEA) for Large-Scale Classification", *Proceedings of the 7th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining*, 377–382, 2001.
+
+**Use of AI assistance (Part 2)**
+
+- I used Claude (Anthropic), an AI assistant, through Claude Code for Part 2. It wrote most of the code in `part2/perceptron.py` and `part2/mlp.py`, ran the experiments and checks, and drafted most of the Part 2 text and tables in this report from the program output.
+- It also carried out the data checks that shaped the discussion: that SeaSyn's test rows are copies of its first 40 training rows, that SeaSyn is not perfectly linearly separable, and the shape of the two RingSyn classes.
+- All results, tables and figures in Part 2 were produced by running the submitted programs, and can be reproduced with the commands in `readme.txt`.
