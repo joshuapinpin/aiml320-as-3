@@ -23,7 +23,7 @@ OPS = {
     "O31": ("J3", 1, "M1", 40), "O32": ("J3", 2, "M2", 20),
 }
 MACHINES = ["M1", "M2"]
-JOB_COLOURS = {"J1": "tab:blue", "J2": "tab:orange", "J3": "tab:green"}
+JOB_COLOURS = {"J1": "#ff5757", "J2": "#38b6ff", "J3": "#7ed957"}
 
 # ---- Schedules from the hand calculations (Q1 and Q3): list of (op, machine, start) ----
 FCFS = [
@@ -104,56 +104,47 @@ def summarise(name, schedule, finish):
     return makespan
 
 
-def idle_gaps(schedule, finish, machine, until):
-    """Return (start, length) of each period where `machine` is idle between 0 and `until`."""
-    gaps, t = [], 0
-    for start, op in sorted((s, op) for op, m, s in schedule if m == machine):
-        if start > t:
-            gaps.append((t, start - t))
-        t = max(t, finish[op])
-    if until > t:
-        gaps.append((t, until - t))
-    return gaps
-
-
 def plot_gantt(schedule, finish, title, out_path, x_max=150):
-    """Draw one row per machine (M1 on top), one bar per op coloured by job, and save to `out_path`."""
+    """Draw one row per machine (M1 on top) and one flat bar per op, coloured by job and
+    labelled "op: start-finish", inside a black frame with grey gridlines every 10 time units.
+    Dashed lines mark job arrivals, a black line marks the makespan, and a job colour key
+    sits on the right."""
     makespan = max(finish.values())
     y_pos = {m: len(MACHINES) - 1 - i for i, m in enumerate(MACHINES)}  # M1 on top
     height = 0.6
 
-    fig, ax = plt.subplots(figsize=(9, 3))
-    for m in MACHINES:
-        y = y_pos[m] - height / 2
-        # light grey hatched bars for idle time, up to the makespan
-        ax.broken_barh(idle_gaps(schedule, finish, m, makespan), (y, height),
-                       facecolor="none", edgecolor="lightgrey", hatch="///", linewidth=0)
+    fig, ax = plt.subplots(figsize=(10, 3.8))
     for op, m, start in schedule:
         job, _, _, proc = OPS[op]
-        ax.broken_barh([(start, proc)], (y_pos[m] - height / 2, height),
-                       facecolor=JOB_COLOURS[job], edgecolor="black")
-        ax.text(start + proc / 2, y_pos[m], f"{op}\n{start}-{start + proc}",
-                ha="center", va="center", fontsize=8, color="white", fontweight="bold")
+        ax.barh(y_pos[m], proc, left=start, height=height, color=JOB_COLOURS[job],
+                linewidth=0, zorder=3)
+        ax.text(start + proc / 2, y_pos[m], f"{op}: {start}-{start + proc}",
+                ha="center", va="center", fontsize=10, color="white", fontweight="bold", zorder=4)
 
-    # dashed arrival lines behind the bars, labelled in the gap between the machine rows
+    # dashed arrival lines behind the bars but above the frame (so J1's line at t=0 shows),
+    # labelled just above the frame
     for job, t in ARRIVAL.items():
-        ax.axvline(t, color=JOB_COLOURS[job], linestyle="--", linewidth=1, zorder=0)
-        ax.text(t + 0.8, 0.5, f"{job} arr.", va="center", ha="left",
-                fontsize=7, color=JOB_COLOURS[job])
-    ax.axvline(makespan, color="red", linewidth=1.5)
-    ax.text(makespan - 1, -0.45, f"makespan = {makespan}", color="red", fontsize=8, va="bottom", ha="right")
+        ax.axvline(t, color=JOB_COLOURS[job], linestyle="--", linewidth=2.5, zorder=2.7)
+        ax.annotate(f"{job} arr.", (t, 1), xycoords=("data", "axes fraction"), xytext=(0, 4),
+                    textcoords="offset points", ha="center", va="bottom",
+                    fontsize=8, fontweight="bold", color=JOB_COLOURS[job])
+    ax.axvline(makespan, color="black", linewidth=2.5, zorder=5)
+    ax.text(makespan - 1.5, -0.55, f"makespan = {makespan}", ha="right", va="center",
+            fontsize=10, fontweight="bold")
 
     ax.set_xlim(0, x_max)
-    ax.set_ylim(-0.5, len(MACHINES) - 0.5)
-    ax.set_yticks(list(y_pos.values()), list(y_pos.keys()))
+    ax.set_ylim(-0.75, len(MACHINES) - 0.25)
     ax.set_xticks(range(0, x_max + 1, 10))
+    ax.set_yticks(list(y_pos.values()), list(y_pos.keys()), fontsize=11, fontweight="bold")
+    ax.tick_params(axis="y", length=0, pad=8)
     ax.set_xlabel("Time")
-    ax.set_title(f"{title} (makespan = {makespan})")
-    ax.grid(axis="x", linestyle=":", alpha=0.5)
+    ax.set_title(title, fontsize=13, fontweight="bold", pad=18)
+    ax.grid(axis="x", color="#d9d9d9", linewidth=2)
     ax.set_axisbelow(True)
-    handles = [Patch(facecolor=c, edgecolor="black", label=j) for j, c in JOB_COLOURS.items()]
-    handles.append(Patch(facecolor="none", edgecolor="lightgrey", hatch="///", label="idle"))
-    ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.01, 1), fontsize=8)
+    for spine in ax.spines.values():
+        spine.set_linewidth(2)
+    handles = [Patch(color=c, label=j) for j, c in JOB_COLOURS.items()]
+    ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.01, 1), frameon=False, fontsize=10)
     fig.tight_layout()
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
